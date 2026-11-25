@@ -161,10 +161,6 @@ const copyAllComputedStyles = (
         (cloneNode as HTMLElement).style.color =
           theme?.colorTextBase || 'black';
       }
-      (cloneNode as HTMLElement).style.visibility = 'visible';
-      if (computed.display === 'none') {
-        (cloneNode as HTMLElement).style.display = 'block';
-      }
     }
 
     for (let i = 0; i < origNode.children.length; i += 1) {
@@ -190,9 +186,18 @@ const processCloneForVisibility = (
   clone: HTMLElement,
   clipHorizontalOverflow = false,
 ) => {
+  const isInsideGrid = (element: HTMLElement) =>
+    element.closest('[data-themed-ag-grid]') !== null;
+  const isHidden = (element: HTMLElement) =>
+    window.getComputedStyle(element).display === 'none';
   const cloneStyle = clone.style;
-  cloneStyle.height = 'auto';
-  cloneStyle.maxHeight = 'none';
+  if (isInsideGrid(clone) && clipsOverflow(clone)) {
+    cloneStyle.overflow = 'hidden';
+  }
+  if (!isInsideGrid(clone) && !isHidden(clone)) {
+    cloneStyle.height = 'auto';
+    cloneStyle.maxHeight = 'none';
+  }
 
   const scrollableSelectors = [
     '[style*="overflow"]',
@@ -213,6 +218,11 @@ const processCloneForVisibility = (
   scrollableSelectors.forEach(selector => {
     clone.querySelectorAll(selector).forEach(el => {
       const element = el as HTMLElement;
+      if (isHidden(element)) return;
+      if (isInsideGrid(element)) {
+        if (clipsOverflow(element)) element.style.overflow = 'hidden';
+        return;
+      }
       element.style.height = 'auto';
       element.style.maxHeight = 'none';
       if (!clipsOverflow(element)) return;
@@ -239,6 +249,7 @@ const processCloneForVisibility = (
     .querySelectorAll('table, .ant-table, .table-container, .data-table')
     .forEach(table => {
       const el = table as HTMLElement;
+      if (isInsideGrid(el) || isHidden(el)) return;
       el.style.margin = '0 auto';
       el.style.display = 'table';
       el.style.width = '100%';
@@ -249,8 +260,8 @@ const processCloneForVisibility = (
     .querySelectorAll('tr, .ant-table-row, .table-row, .data-row')
     .forEach(row => {
       const el = row as HTMLElement;
+      if (isInsideGrid(el) || isHidden(el)) return;
       el.style.display = 'table-row';
-      el.style.visibility = 'visible';
       el.style.height = 'auto';
     });
 
@@ -258,8 +269,8 @@ const processCloneForVisibility = (
     .querySelectorAll('td, th, .ant-table-cell, .table-cell')
     .forEach(cell => {
       const el = cell as HTMLElement;
+      if (isInsideGrid(el) || isHidden(el)) return;
       el.style.display = 'table-cell';
-      el.style.visibility = 'visible';
     });
 
   clone.querySelectorAll('*').forEach(el => {
@@ -269,10 +280,6 @@ const processCloneForVisibility = (
       if (computed.color === 'transparent') {
         element.style.color = 'black';
       }
-      element.style.visibility = 'visible';
-      if (computed.display === 'none') {
-        element.style.display = 'block';
-      }
     }
   });
 
@@ -280,6 +287,7 @@ const processCloneForVisibility = (
     .querySelectorAll('[data-virtualized], .virtualized, .lazy-load')
     .forEach(el => {
       const element = el as HTMLElement;
+      if (isInsideGrid(element) || isHidden(element)) return;
       element.style.height = 'auto';
       element.style.maxHeight = 'none';
     });

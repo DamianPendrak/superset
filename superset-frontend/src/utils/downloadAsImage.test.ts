@@ -845,6 +845,99 @@ test('dashboard clone path expands scrollable content vertically without unclipp
   cleanup();
 });
 
+test.each(['png', 'jpeg'] as const)(
+  'keeps intentionally hidden text and table rows hidden in %s clones',
+  async format => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div style="display: none">Hidden panel</div>
+      <table><tbody><tr style="display: none"><td>Hidden row</td></tr></tbody></table>
+      <span style="visibility: hidden">Hidden text</span>
+    `;
+    document.body.appendChild(container);
+    try {
+      await downloadAsImageOptimized('div', 'Chart', false, undefined, {
+        format,
+      })(syntheticEventFor(container));
+      const capture = format === 'png' ? mockToPng : mockToJpeg;
+      const clone = capture.mock.calls[0][0] as HTMLElement;
+      expect(
+        window.getComputedStyle(clone.querySelector('div') as Element).display,
+      ).toBe('none');
+      expect(
+        window.getComputedStyle(clone.querySelector('tr') as Element).display,
+      ).toBe('none');
+      expect(
+        window.getComputedStyle(clone.querySelector('span') as Element)
+          .visibility,
+      ).toBe('hidden');
+    } finally {
+      container.remove();
+    }
+  },
+);
+
+test.each(['png', 'jpeg'] as const)(
+  'preserves hidden content and nested grid geometry in %s clones',
+  async format => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div data-themed-ag-grid style="height: 400px; overflow: hidden">
+        <div style="height: 600px; overflow: hidden">
+          <div data-themed-ag-grid style="height: 200px; max-height: 240px; overflow: auto">Rows</div>
+        </div>
+        <div style="display: none">Hidden paging panel</div>
+      </div>
+      <table style="display: none"><tbody><tr><td>Hidden table</td></tr></tbody></table>
+      <div style="visibility: hidden">Hidden text</div>
+      <button>Chart pager</button>
+    `;
+    document.body.appendChild(container);
+    try {
+      await downloadAsImageOptimized('div', 'Chart', false, undefined, {
+        format,
+      })(syntheticEventFor(container));
+      const capture = format === 'png' ? mockToPng : mockToJpeg;
+      const clone = capture.mock.calls[0][0] as HTMLElement;
+      const grid = clone.querySelector('[data-themed-ag-grid]') as HTMLElement;
+      expect(grid.style.height).toBe('400px');
+      expect(grid.style.overflow).toBe('hidden');
+      expect((grid.firstElementChild as HTMLElement).style.height).toBe(
+        '600px',
+      );
+      expect(
+        (grid.querySelector('[data-themed-ag-grid]') as HTMLElement).style
+          .height,
+      ).toBe('200px');
+      expect(
+        (grid.querySelector('[data-themed-ag-grid]') as HTMLElement).style
+          .overflow,
+      ).toBe('hidden');
+      expect(
+        (grid.querySelector('[data-themed-ag-grid]') as HTMLElement).style
+          .maxHeight,
+      ).toBe('240px');
+      expect(
+        window.getComputedStyle(grid.lastElementChild as Element).display,
+      ).toBe('none');
+      expect(
+        window.getComputedStyle(clone.querySelector('table') as Element)
+          .display,
+      ).toBe('none');
+      expect(
+        window.getComputedStyle(
+          clone.querySelector('[style*="visibility: hidden"]') as Element,
+        ).visibility,
+      ).toBe('hidden');
+      expect(
+        container.querySelector('[data-themed-ag-grid]')?.getAttribute('style'),
+      ).toBe('height: 400px; overflow: hidden');
+    } finally {
+      container.remove();
+    }
+  },
+);
+
 test('shows warning toast when clone capture throws', async () => {
   mockToJpeg.mockRejectedValue(new Error('clone capture failed'));
   const container = document.createElement('div');
